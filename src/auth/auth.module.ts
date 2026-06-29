@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { UsersModule } from 'src/users/users.module';
@@ -8,10 +8,11 @@ import { UserSessionEntity } from './entities/user-session.entity';
 import { AuthTokenService } from './services/auth-token.service';
 import { AuthCookieService } from './services/auth-cookie.service';
 import { AccessTokenGuard } from './guards/access-token.guard';
+import { FileService } from 'src/common/services/file.service';
 
 @Module({
   imports: [
-    UsersModule,
+    forwardRef(() => UsersModule),
     JwtModule.register({}),
     TypeOrmModule.forFeature([UserSessionEntity]),
   ],
@@ -21,6 +22,7 @@ import { AccessTokenGuard } from './guards/access-token.guard';
     AuthTokenService,
     AuthCookieService,
     AccessTokenGuard,
+    FileService,
   ],
   exports: [AuthService, AccessTokenGuard],
 })

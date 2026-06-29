@@ -10,9 +10,11 @@ import {
 import { getFieldErrors } from './modules/auth/utils/error.utils';
 import { setupSwagger } from './config/swagger.config';
 import { ERROR_CODES, ERROR_MESSAGES } from './constants/error.constants';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { join } from 'path';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   app.setGlobalPrefix('api');
 
@@ -42,6 +44,14 @@ async function bootstrap() {
   app.enableCors({
     origin: configService.get<string>('FRONTEND_URL', 'http://localhost:3000'),
     credentials: true,
+  });
+
+  const staticAssetsPath = configService.get<string>(
+    'STATIC_ASSETS_PATH',
+    'uploads',
+  );
+  app.useStaticAssets(join(process.cwd(), staticAssetsPath), {
+    prefix: `/${staticAssetsPath}`,
   });
 
   if (configService.get<string>('NODE_ENV') !== 'production') {

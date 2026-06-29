@@ -1,9 +1,14 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UserEntity } from './entities/user.entity';
 import { Repository } from 'typeorm';
 import { CreateUserParams } from 'src/types/user.type';
 import { ERROR_MESSAGES } from 'src/constants/error.constants';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Injectable()
 export class UsersService {
@@ -55,5 +60,44 @@ export class UsersService {
         id,
       },
     });
+  }
+
+  async updateProfile(
+    userId: string,
+    dto: UpdateProfileDto,
+  ): Promise<UserEntity> {
+    const user = await this.findById(userId);
+
+    if (!user) {
+      throw new NotFoundException(ERROR_MESSAGES.USER_NOT_FOUND);
+    }
+
+    Object.assign(user, dto);
+
+    return this.usersRepository.save(user);
+  }
+
+  async updateAvatar(userId: string, avatarUrl: string): Promise<UserEntity> {
+    const user = await this.findById(userId);
+
+    if (!user) {
+      throw new NotFoundException(ERROR_MESSAGES.USER_NOT_FOUND);
+    }
+
+    user.avatarUrl = avatarUrl;
+
+    return this.usersRepository.save(user);
+  }
+
+  async deleteAvatar(userId: string): Promise<UserEntity> {
+    const user = await this.findById(userId);
+
+    if (!user) {
+      throw new NotFoundException(ERROR_MESSAGES.USER_NOT_FOUND);
+    }
+
+    user.avatarUrl = null;
+
+    return this.usersRepository.save(user);
   }
 }

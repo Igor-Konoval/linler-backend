@@ -15,16 +15,19 @@ import * as bcrypt from 'bcrypt';
 import { hashToken } from 'src/modules/auth/utils/token-hash.utils';
 import type { AuthUser } from 'src/types/user.type';
 import { ERROR_MESSAGES } from 'src/constants/error.constants';
-import { getEnv } from 'src/config/env.config';
+import { ENV_VARIABLES } from 'src/constants/env.constants';
+import { ConfigService } from '@nestjs/config';
+import { FileService } from 'src/common/services/file.service';
 
 @Injectable()
 export class AuthService {
   private readonly refreshTtlMs = REFRESH_TTL_MS;
 
   constructor(
+    private readonly configService: ConfigService,
     private readonly usersService: UsersService,
     private readonly authTokenService: AuthTokenService,
-
+    private readonly fileService: FileService,
     @InjectRepository(UserSessionEntity)
     private readonly sessionsRepository: Repository<UserSessionEntity>,
   ) {}
@@ -34,7 +37,7 @@ export class AuthService {
       id: user.id,
       email: user.email,
       username: user.username,
-      avatarUrl: user.avatarUrl,
+      avatarUrl: this.fileService.getFullAvatarUrl(user.avatarUrl),
     };
   }
 
@@ -149,7 +152,9 @@ export class AuthService {
         },
       );
     } catch (error) {
-      if (getEnv().NODE_ENV === 'development') {
+      if (
+        this.configService.get<string>(ENV_VARIABLES.NODE_ENV) !== 'production'
+      ) {
         if (error instanceof Error) {
           console.error(`Logout failed: ${error.message}`);
         }
