@@ -13,6 +13,9 @@ export const ERROR_MESSAGES = {
 
   // Validation
   VALIDATION_FAILED: 'Validation failed',
+  INVALID_FILE_TYPE: 'Invalid file type',
+  FILE_TOO_LARGE: 'File too large',
+  FAILED_TO_UPLOAD_AVATAR: 'Failed to upload avatar',
 
   // User
   USER_NOT_FOUND: 'User not found',
