@@ -19,9 +19,9 @@ jobs:
           node-version: 20
           cache: pnpm
       - name: Install deps
-        run: pnpm ci
+        run: pnpm install --frozen-lockfile
       - name: Lint
-        run: pnpm lint
+        run: pnpm lint:check
       - name: Test
         run: pnpm test -- --runInBand
       - name: Build
