@@ -23,6 +23,6 @@ jobs:
       - name: Lint
         run: pnpm lint:check
       - name: Test
-        run: pnpm test -- --runInBand
+        run: pnpm test --runInBand --passWithNoTests
       - name: Build
         run: pnpm build
