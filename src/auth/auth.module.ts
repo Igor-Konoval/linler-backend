@@ -9,10 +9,12 @@ import { AuthTokenService } from './services/auth-token.service';
 import { AuthCookieService } from './services/auth-cookie.service';
 import { AccessTokenGuard } from './guards/access-token.guard';
 import { FileService } from 'src/common/services/file.service';
+import { WorkspacesModule } from 'src/workspaces/workspaces.module';
 
 @Module({
   imports: [
     forwardRef(() => UsersModule),
+    forwardRef(() => WorkspacesModule),
     JwtModule.register({}),
     TypeOrmModule.forFeature([UserSessionEntity]),
   ],

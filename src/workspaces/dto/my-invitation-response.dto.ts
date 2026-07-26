@@ -1,0 +1,34 @@
+import { ApiProperty } from '@nestjs/swagger';
+import {
+  WorkspaceInvitationStatus,
+  WorkspaceRole,
+} from '../enums/workspace.enums';
+
+export class MyInvitationResponseDto {
+  @ApiProperty({ example: 'b2d3e27e-8d7f-4d79-9e04-3887c5feb614' })
+  id!: string;
+
+  @ApiProperty({ example: 'b2d3e27e-8d7f-4d79-9e04-3887c5feb614' })
+  workspaceId!: string;
+
+  @ApiProperty({ example: "Igor's Workspace" })
+  workspaceName!: string;
+
+  @ApiProperty({ enum: WorkspaceRole, example: WorkspaceRole.MEMBER })
+  role!: WorkspaceRole;
+
+  @ApiProperty({
+    enum: WorkspaceInvitationStatus,
+    example: WorkspaceInvitationStatus.PENDING,
+  })
+  status!: WorkspaceInvitationStatus;
+
+  @ApiProperty({ example: false })
+  isRead!: boolean;
+
+  @ApiProperty()
+  expiresAt!: Date;
+
+  @ApiProperty()
+  createdAt!: Date;
+}
