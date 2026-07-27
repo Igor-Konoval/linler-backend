@@ -1,5 +1,11 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  UnauthorizedException,
+  forwardRef,
+} from '@nestjs/common';
 import { UsersService } from 'src/users/users.service';
+import { WorkspacesService } from 'src/workspaces/workspaces.service';
 import { AuthTokenService } from './services/auth-token.service';
 import { REFRESH_TTL_MS } from 'src/constants/auth-cookies.constants';
 import { UserSessionEntity } from './entities/user-session.entity';
@@ -28,6 +34,8 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly authTokenService: AuthTokenService,
     private readonly fileService: FileService,
+    @Inject(forwardRef(() => WorkspacesService))
+    private readonly workspacesService: WorkspacesService,
     @InjectRepository(UserSessionEntity)
     private readonly sessionsRepository: Repository<UserSessionEntity>,
   ) {}
@@ -49,6 +57,11 @@ export class AuthService {
       username: params.username,
       passwordHash,
     });
+
+    await this.workspacesService.ensurePersonalWorkspace(
+      user.id,
+      user.username,
+    );
 
     return this.createAuthSession(user, meta);
   }

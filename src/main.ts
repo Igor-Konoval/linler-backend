@@ -12,6 +12,7 @@ import { setupSwagger } from './config/swagger.config';
 import { ERROR_CODES, ERROR_MESSAGES } from './constants/error.constants';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
+import { ENV_VARIABLES } from './constants/env.constants';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -42,23 +43,26 @@ async function bootstrap() {
   );
 
   app.enableCors({
-    origin: configService.get<string>('FRONTEND_URL', 'http://localhost:3000'),
+    origin: configService.get<string>(
+      ENV_VARIABLES.FRONTEND_URL,
+      'http://localhost:3000',
+    ),
     credentials: true,
   });
 
   const staticAssetsPath = configService.get<string>(
-    'STATIC_ASSETS_PATH',
+    ENV_VARIABLES.STATIC_ASSETS_PATH,
     'uploads',
   );
   app.useStaticAssets(join(process.cwd(), staticAssetsPath), {
     prefix: `/${staticAssetsPath}`,
   });
 
-  if (configService.get<string>('NODE_ENV') !== 'production') {
+  if (configService.get<string>(ENV_VARIABLES.NODE_ENV) !== 'production') {
     setupSwagger(app, configService);
   }
 
-  await app.listen(configService.get<number>('PORT') ?? 3001);
+  await app.listen(configService.get<number>(ENV_VARIABLES.PORT) ?? 3001);
 }
 
 void bootstrap();

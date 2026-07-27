@@ -5,12 +5,12 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { randomUUID } from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import sharp from 'sharp';
 import { ENV_VARIABLES } from 'src/constants/env.constants';
 import { ERROR_MESSAGES } from 'src/constants/error.constants';
-import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class FileService {
@@ -65,7 +65,7 @@ export class FileService {
     }
 
     try {
-      const filename = `${uuidv4()}-${Date.now()}.webp`;
+      const filename = `${randomUUID()}-${Date.now()}.webp`;
       const filepath = path.join(this.uploadsDir, filename);
 
       await sharp(file.buffer)
