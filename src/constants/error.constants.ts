@@ -52,6 +52,23 @@ export const ERROR_MESSAGES = {
     'User must be an active member of the workspace to be added to a project',
   PROJECT_OWNER_CANNOT_BE_REMOVED: 'The project owner cannot be removed',
 
+  // Page
+  PAGE_NOT_FOUND: 'Page not found',
+  PAGE_ACCESS_DENIED: 'You do not have access to this page',
+  PAGE_INSUFFICIENT_ROLE:
+    'You do not have enough permissions to edit this page',
+  PAGE_PARENT_NOT_FOUND: 'Parent page not found in this project',
+  PAGE_PARENT_CYCLE_DETECTED:
+    'Cannot move page under itself or its descendants',
+  PAGE_MUST_BE_ARCHIVED_BEFORE_PERMANENT_DELETE:
+    'Page must be archived before permanent deletion',
+  PAGE_DELETE_CHILDREN_STRATEGY_REQUIRED:
+    'Permanent deletion requires a strategy when page has children',
+
+  // Attachments
+  ATTACHMENT_NOT_FOUND: 'Attachment not found',
+  FAILED_TO_UPLOAD_ATTACHMENT: 'Failed to upload attachment',
+
   // Generic
   INTERNAL_SERVER_ERROR: 'Internal server error',
   RESOURCE_NOT_FOUND: 'Resource not found',
@@ -69,5 +86,13 @@ export const ERROR_CODES = {
   PROJECT_NOT_FOUND: 'PROJECT_NOT_FOUND',
   PROJECT_ACCESS_DENIED: 'PROJECT_ACCESS_DENIED',
   PROJECT_INSUFFICIENT_ROLE: 'PROJECT_INSUFFICIENT_ROLE',
+  PAGE_NOT_FOUND: 'PAGE_NOT_FOUND',
+  PAGE_ACCESS_DENIED: 'PAGE_ACCESS_DENIED',
+  PAGE_INSUFFICIENT_ROLE: 'PAGE_INSUFFICIENT_ROLE',
+  PAGE_MUST_BE_ARCHIVED_BEFORE_PERMANENT_DELETE:
+    'PAGE_MUST_BE_ARCHIVED_BEFORE_PERMANENT_DELETE',
+  PAGE_DELETE_CHILDREN_STRATEGY_REQUIRED:
+    'PAGE_DELETE_CHILDREN_STRATEGY_REQUIRED',
+  ATTACHMENT_NOT_FOUND: 'ATTACHMENT_NOT_FOUND',
   INTERNAL_SERVER_ERROR: 'INTERNAL_SERVER_ERROR',
 } as const;

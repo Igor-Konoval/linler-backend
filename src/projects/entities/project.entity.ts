@@ -5,6 +5,7 @@ import {
   Index,
   JoinColumn,
   ManyToOne,
+  OneToOne,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -13,6 +14,7 @@ import { UserEntity } from '../../users/entities/user.entity';
 import { WorkspaceEntity } from '../../workspaces/entities/workspace.entity';
 import { ProjectMemberEntity } from './project-member.entity';
 import { ProjectVisibility } from '../enums/project.enums';
+import { PageEntity } from 'src/pages/entities/page.entity';
 
 @Entity('projects')
 export class ProjectEntity {
@@ -34,6 +36,19 @@ export class ProjectEntity {
   @ManyToOne(() => UserEntity, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'owner_id' })
   owner!: UserEntity;
+
+  @Index()
+  @Column({ name: 'default_page_id', type: 'uuid', nullable: true })
+  defaultPageId!: string | null;
+
+  @OneToOne(() => PageEntity, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({
+    name: 'default_page_id',
+  })
+  defaultPage!: PageEntity | null;
 
   @Column({ type: 'varchar', length: 160 })
   name!: string;
@@ -59,6 +74,9 @@ export class ProjectEntity {
 
   @OneToMany(() => ProjectMemberEntity, (member) => member.project)
   members!: ProjectMemberEntity[];
+
+  @OneToMany(() => PageEntity, (page) => page.project)
+  pages!: PageEntity[];
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
