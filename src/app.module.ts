@@ -3,11 +3,12 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { getTypeOrmConfig } from './config/typeorm.config';
 import { AuthModule } from './auth/auth.module';
+import { getTypeOrmConfig } from './config/typeorm.config';
+import { PagesModule } from './pages/pages.module';
+import { ProjectsModule } from './projects/projects.module';
 import { UsersModule } from './users/users.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
-import { ProjectsModule } from './projects/projects.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { ProjectsModule } from './projects/projects.module';
     UsersModule,
     WorkspacesModule,
     ProjectsModule,
+    PagesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

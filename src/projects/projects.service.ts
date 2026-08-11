@@ -16,8 +16,10 @@ import {
 import { ProjectEntity } from './entities/project.entity';
 import { ProjectMemberEntity } from './entities/project-member.entity';
 import { ProjectRole, ProjectVisibility } from './enums/project.enums';
+import { PageEntity } from 'src/pages/entities/page.entity';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
+import { SetDefaultPageDto } from './dto/set-default-page.dto';
 import { AddProjectMemberDto } from './dto/add-project-member.dto';
 import { UpdateProjectMemberDto } from './dto/update-project-member.dto';
 import { ProjectResponseDto } from './dto/project-response.dto';
@@ -76,6 +78,35 @@ export class ProjectsService {
           }),
         );
 
+        const defaultPage = await manager.save(
+          manager.create(PageEntity, {
+            projectId: created.id,
+            parentPageId: null,
+            title: 'Untitled',
+            icon: '📄',
+            cover: null,
+            coverMeta: null,
+            width: 1280,
+            height: 320,
+            objectPositionX: 50,
+            objectPositionY: 50,
+            editorMeta: null,
+            contentWidth: 720,
+            contentOffsetX: 0,
+            content: {
+              type: 'doc',
+              content: [],
+            },
+            orderIndex: 0,
+            isArchived: false,
+            createdById: userId,
+            updatedById: userId,
+          }),
+        );
+
+        created.defaultPageId = defaultPage.id;
+        await manager.save(created);
+
         return created;
       },
     );
@@ -93,7 +124,7 @@ export class ProjectsService {
     );
 
     const projects = await this.projectsRepository.find({
-      where: { workspaceId },
+      where: { workspaceId, isArchived: false },
       order: { orderIndex: 'ASC', createdAt: 'ASC' },
     });
 
@@ -142,6 +173,40 @@ export class ProjectsService {
 
     const saved = await this.projectsRepository.save(project);
 
+    return this.toProjectResponse(saved, access.role);
+  }
+
+  async setDefaultPage(
+    userId: string,
+    projectId: string,
+    dto: SetDefaultPageDto,
+  ): Promise<ProjectResponseDto> {
+    const access = await this.resolveAccess(projectId, userId);
+    this.assertOwner(access);
+
+    if (dto.pageId === null) {
+      access.project.defaultPageId = null;
+      const saved = await this.projectsRepository.save(access.project);
+      return this.toProjectResponse(saved, access.role);
+    }
+
+    const page = await this.projectsRepository.manager.findOne(PageEntity, {
+      where: {
+        id: dto.pageId,
+        projectId,
+      },
+      select: {
+        id: true,
+        isArchived: true,
+      },
+    });
+
+    if (!page || page.isArchived) {
+      throw new NotFoundException(ERROR_MESSAGES.PAGE_NOT_FOUND);
+    }
+
+    access.project.defaultPageId = page.id;
+    const saved = await this.projectsRepository.save(access.project);
     return this.toProjectResponse(saved, access.role);
   }
 
@@ -380,6 +445,7 @@ export class ProjectsService {
       id: project.id,
       workspaceId: project.workspaceId,
       ownerId: project.ownerId,
+      defaultPageId: project.defaultPageId,
       name: project.name,
       icon: project.icon,
       description: project.description,

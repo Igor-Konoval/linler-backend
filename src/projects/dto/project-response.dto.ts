@@ -11,6 +11,12 @@ export class ProjectResponseDto {
   @ApiProperty({ example: 'b2d3e27e-8d7f-4d79-9e04-3887c5feb614' })
   ownerId!: string;
 
+  @ApiProperty({
+    example: 'b2d3e27e-8d7f-4d79-9e04-3887c5feb614',
+    nullable: true,
+  })
+  defaultPageId!: string | null;
+
   @ApiProperty({ example: 'Analytics' })
   name!: string;
 
