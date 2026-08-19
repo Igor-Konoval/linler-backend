@@ -11,8 +11,11 @@ import { getFieldErrors } from './modules/auth/utils/error.utils';
 import { setupSwagger } from './config/swagger.config';
 import { ERROR_CODES, ERROR_MESSAGES } from './constants/error.constants';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { join } from 'path';
 import { ENV_VARIABLES } from './constants/env.constants';
+import {
+  resolveDataPath,
+  toPublicUrlPath,
+} from './common/utils/upload-path.util';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -54,8 +57,8 @@ async function bootstrap() {
     ENV_VARIABLES.STATIC_ASSETS_PATH,
     'uploads',
   );
-  app.useStaticAssets(join(process.cwd(), staticAssetsPath), {
-    prefix: `/${staticAssetsPath}`,
+  app.useStaticAssets(resolveDataPath(staticAssetsPath), {
+    prefix: toPublicUrlPath(staticAssetsPath),
   });
 
   if (configService.get<string>(ENV_VARIABLES.NODE_ENV) !== 'production') {
