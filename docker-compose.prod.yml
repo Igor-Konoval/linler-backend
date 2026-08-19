@@ -1,0 +1,34 @@
+services:
+  postgres:
+    container_name: linler-postgres
+    image: postgres:16
+    restart: unless-stopped
+    env_file:
+      - backend.env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - linler-network
+
+  backend:
+    container_name: linler-backend
+    image: ghcr.io/igor-konoval/linler-backend:latest
+    restart: unless-stopped
+    env_file:
+      - backend.env
+    ports:
+      - '${PORT:-3001}:3001'
+    volumes:
+      - uploads_data:/uploads
+    depends_on:
+      - postgres
+    networks:
+      - linler-network
+
+volumes:
+  postgres_data:
+  uploads_data:
+
+networks:
+  linler-network:
+    name: linler-network

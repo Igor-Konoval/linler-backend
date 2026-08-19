@@ -40,8 +40,8 @@ export const ALLOWED_FILE_EXTENSIONS = [
   '.7z',
 ];
 
-export const ATTACHMENTS_UPLOAD_DIR = '/uploads/attachments';
+export const ATTACHMENTS_UPLOAD_DIR = 'uploads/attachments';
 
-export const AVATARS_UPLOAD_DIR = '/uploads/avatars';
+export const AVATARS_UPLOAD_DIR = 'uploads/avatars';
 
 export const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];

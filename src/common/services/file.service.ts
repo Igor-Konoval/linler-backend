@@ -19,10 +19,15 @@ import {
   ATTACHMENTS_UPLOAD_DIR,
   AVATARS_UPLOAD_DIR,
 } from 'src/constants/file.constants';
+import {
+  resolveDataPath,
+  toPublicUrlPath,
+} from 'src/common/utils/upload-path.util';
 
 @Injectable()
 export class FileService {
   private readonly avatarUploadsDir: string;
+  private readonly avatarPublicDir: string;
   private readonly avatarMaxFileSizeBytes: number;
   private readonly avatarAllowedMimeTypes: string[];
   private readonly avatarSize: number;
@@ -35,13 +40,13 @@ export class FileService {
   private readonly attachmentsAllowedExtensions: Set<string>;
 
   constructor(private readonly configService: ConfigService) {
-    this.avatarUploadsDir = path.join(
-      process.cwd(),
-      this.configService.get<string>(
-        ENV_VARIABLES.UPLOAD_DIR,
-        AVATARS_UPLOAD_DIR,
-      ),
+    const rawAvatarUploadDir = this.configService.get<string>(
+      ENV_VARIABLES.UPLOAD_DIR,
+      AVATARS_UPLOAD_DIR,
     );
+    this.avatarUploadsDir = resolveDataPath(rawAvatarUploadDir);
+    this.avatarPublicDir = toPublicUrlPath(rawAvatarUploadDir);
+
     this.avatarMaxFileSizeBytes = this.configService.get<number>(
       ENV_VARIABLES.MAX_FILE_SIZE,
       2 * 1024 * 1024,
@@ -57,18 +62,12 @@ export class FileService {
       this.configService.get<number>(ENV_VARIABLES.AVATAR_QUALITY, 85),
     );
 
-    const rawAttachmentsPublicDir = this.configService.get<string>(
+    const rawAttachmentsUploadDir = this.configService.get<string>(
       ENV_VARIABLES.ATTACHMENTS_UPLOAD_DIR,
       ATTACHMENTS_UPLOAD_DIR,
     );
-    const normalizedAttachmentsPublicDir = this.normalizePublicUploadDir(
-      rawAttachmentsPublicDir,
-    );
-    this.attachmentsPublicDir = normalizedAttachmentsPublicDir;
-    this.attachmentsUploadsDir = path.join(
-      process.cwd(),
-      normalizedAttachmentsPublicDir.replace(/^\//, ''),
-    );
+    this.attachmentsUploadsDir = resolveDataPath(rawAttachmentsUploadDir);
+    this.attachmentsPublicDir = toPublicUrlPath(rawAttachmentsUploadDir);
     this.attachmentsMaxFileSizeBytes = Number(
       this.configService.get<number>(
         ENV_VARIABLES.ATTACHMENTS_MAX_FILE_SIZE,
@@ -118,7 +117,7 @@ export class FileService {
         .webp({ quality: this.avatarQuality })
         .toFile(filepath);
 
-      return `${this.configService.get<string>(ENV_VARIABLES.UPLOAD_DIR, 'uploads/avatars')}/${filename}`;
+      return `${this.avatarPublicDir}/${filename}`;
     } catch (error) {
       console.error(`${ERROR_MESSAGES.FAILED_TO_UPLOAD_AVATAR}:`, error);
       throw new InternalServerErrorException(
@@ -151,7 +150,7 @@ export class FileService {
     const mediaUrl = this.configService.getOrThrow<string>(
       ENV_VARIABLES.MEDIA_URL,
     );
-    return `${mediaUrl}${avatarUrl}`;
+    return `${mediaUrl}${toPublicUrlPath(avatarUrl)}`;
   }
 
   async uploadAttachment(file: Express.Multer.File): Promise<{
@@ -221,7 +220,7 @@ export class FileService {
     const mediaUrl = this.configService.getOrThrow<string>(
       ENV_VARIABLES.MEDIA_URL,
     );
-    return `${mediaUrl}${fileUrl}`;
+    return `${mediaUrl}${toPublicUrlPath(fileUrl)}`;
   }
 
   async readAttachmentForDownload(fileUrl: string): Promise<Buffer> {
@@ -247,13 +246,6 @@ export class FileService {
     const extension = this.getExtensionFromOriginalName(file.originalname);
 
     return this.attachmentsAllowedExtensions.has(extension);
-  }
-
-  private normalizePublicUploadDir(uploadDir: string): string {
-    const forwardSlashes = uploadDir.replace(/\\/g, '/');
-    return forwardSlashes.startsWith('/')
-      ? forwardSlashes
-      : `/${forwardSlashes}`;
   }
 
   private normalizeOriginalFileName(originalName: string): string {
