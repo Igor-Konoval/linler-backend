@@ -20,6 +20,8 @@ import {
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
+  app.set('trust proxy', 1);
+
   app.setGlobalPrefix('api');
 
   const configService = app.get(ConfigService);
