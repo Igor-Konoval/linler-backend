@@ -64,6 +64,10 @@ export const ERROR_MESSAGES = {
     'Page must be archived before permanent deletion',
   PAGE_DELETE_CHILDREN_STRATEGY_REQUIRED:
     'Permanent deletion requires a strategy when page has children',
+  PAGE_CONTENT_INVALID: 'Invalid page content',
+  TASK_BOARD_INVALID: 'Invalid task board data',
+  TASK_BOARD_INVALID_COLOR: 'Invalid task board color',
+  TASK_BOARD_INVALID_PRIORITY: 'Invalid task card priority',
 
   // Attachments
   ATTACHMENT_NOT_FOUND: 'Attachment not found',

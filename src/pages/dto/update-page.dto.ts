@@ -100,8 +100,43 @@ export class UpdatePageDto {
   parentPageId?: string | null;
 
   @ApiPropertyOptional({
-    example: { type: 'doc', content: [{ type: 'paragraph', content: [] }] },
-    description: 'Store the entire document as a single JSONB field',
+    example: {
+      type: 'doc',
+      content: [
+        {
+          type: 'taskBoard',
+          attrs: {
+            boardId: 'board-1',
+            columns: [
+              { id: 'col-1', name: 'Not started', color: 'gray', order: 0 },
+            ],
+            cards: [
+              {
+                id: 'card-1',
+                columnId: 'col-1',
+                title: 'First task',
+                order: 0,
+                priority: 'high',
+                startDate: null,
+                dueDate: '2026-09-01',
+                assigneeId: null,
+                description: {
+                  type: 'doc',
+                  content: [
+                    {
+                      type: 'paragraph',
+                      content: [{ type: 'text', text: 'Details' }],
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      ],
+    },
+    description:
+      'Tiptap document JSON. May contain one or more taskBoard nodes (kanban).',
   })
   @IsOptional()
   @IsObject()
