@@ -232,6 +232,18 @@ export class ProjectsService {
     return members.map((member) => this.toMemberResponse(member));
   }
 
+  async getProjectMemberUserIds(projectId: string): Promise<Set<string>> {
+    const members = await this.projectMembersRepository.find({
+      where: { projectId },
+      select: {
+        id: true,
+        userId: true,
+      },
+    });
+
+    return new Set(members.map((member) => member.userId));
+  }
+
   async addMember(
     userId: string,
     projectId: string,

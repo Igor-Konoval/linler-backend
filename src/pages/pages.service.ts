@@ -23,6 +23,7 @@ import {
   PAGE_WRITE_ROLES,
   PermanentDeleteChildrenStrategy,
 } from './constants/pages.constants';
+import { sanitizePageContent } from './utils/sanitize-page-content.util';
 
 interface PageAccess {
   page: PageEntity;
@@ -208,7 +209,9 @@ export class PagesService {
     }
 
     if (dto.content !== undefined) {
-      page.content = dto.content;
+      const assignableUserIds =
+        await this.projectsService.getProjectMemberUserIds(page.projectId);
+      page.content = sanitizePageContent(dto.content, assignableUserIds);
     }
 
     if (dto.orderIndex !== undefined) {

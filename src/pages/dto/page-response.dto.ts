@@ -62,7 +62,7 @@ export class PageResponseDto {
   @ApiProperty({
     example: { type: 'doc', content: [] },
     description:
-      'Raw JSON of the editor document (Tiptap/ProseMirror-compatible)',
+      'Tiptap document JSON. May contain one or more taskBoard nodes stored as-is after sanitization',
   })
   content!: Record<string, unknown>;
 
