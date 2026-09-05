@@ -62,7 +62,7 @@ export class PageResponseDto {
   @ApiProperty({
     example: { type: 'doc', content: [] },
     description:
-      'Raw JSON of the editor document (Tiptap/ProseMirror-compatible)',
+      'Tiptap document JSON. May contain one or more taskBoard nodes stored as-is after sanitization',
   })
   content!: Record<string, unknown>;
 
@@ -80,6 +80,32 @@ export class PageResponseDto {
 
   @ApiProperty({ example: 'b2d3e27e-8d7f-4d79-9e04-3887c5feb614' })
   updatedById!: string;
+
+  @ApiProperty({
+    example: {
+      id: 'b2d3e27e-8d7f-4d79-9e04-3887c5feb614',
+      username: 'igor',
+      avatarUrl: 'http://localhost:3001/uploads/avatars/igor.webp',
+    },
+  })
+  updatedBy!: {
+    id: string;
+    username: string;
+    avatarUrl: string | null;
+  };
+
+  @ApiProperty({
+    type: 'array',
+    items: {
+      type: 'object',
+    },
+  })
+  recentEditors!: Array<{
+    id: string;
+    username: string;
+    avatarUrl: string | null;
+    updatedAt: string;
+  }>;
 
   @ApiProperty({ enum: ProjectRole, example: ProjectRole.EDITOR })
   projectRole!: ProjectRole;

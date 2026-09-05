@@ -1,13 +1,20 @@
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { ERROR_MESSAGES } from 'src/constants/error.constants';
 import { FileService } from 'src/common/services/file.service';
+import {
+  PageChangeAction,
+  RealtimeEvent,
+} from 'src/realtime/realtime.constants';
+import { RealtimeService } from 'src/realtime/realtime.service';
 import { ProjectsService } from 'src/projects/projects.service';
 import { ProjectRole } from 'src/projects/enums/project.enums';
 import { ProjectEntity } from 'src/projects/entities/project.entity';
@@ -23,10 +30,12 @@ import {
   PAGE_WRITE_ROLES,
   PermanentDeleteChildrenStrategy,
 } from './constants/pages.constants';
+import { sanitizePageContent } from './utils/sanitize-page-content.util';
 
 interface PageAccess {
   page: PageEntity;
   role: ProjectRole;
+  workspaceId: string;
 }
 
 interface ResolvePageAccessOptions {
@@ -42,6 +51,8 @@ export class PagesService {
     private readonly attachmentsRepository: Repository<PageAttachmentEntity>,
     private readonly projectsService: ProjectsService,
     private readonly fileService: FileService,
+    @Inject(forwardRef(() => RealtimeService))
+    private readonly realtimeService: RealtimeService,
   ) {}
 
   async createPage(
@@ -80,7 +91,19 @@ export class PagesService {
 
     const saved = await this.pagesRepository.save(page);
 
-    return this.toResponse(saved, project.role, []);
+    const withAuthor = await this.loadPageWithAuthor(saved.id);
+    const pageWithHistory = await this.persistRecentEditor(withAuthor ?? saved);
+
+    this.emitPageChanged(
+      PageChangeAction.Created,
+      project.workspaceId,
+      projectId,
+      saved.id,
+      userId,
+      pageWithHistory,
+    );
+
+    return this.toResponse(pageWithHistory, project.role, []);
   }
 
   async listProjectPages(
@@ -111,8 +134,9 @@ export class PagesService {
   async getPage(userId: string, pageId: string): Promise<PageResponseDto> {
     const access = await this.resolveAccess(pageId, userId);
     const attachments = await this.listAttachments(userId, pageId);
+    const withAuthor = await this.loadPageWithAuthor(pageId);
 
-    return this.toResponse(access.page, access.role, attachments);
+    return this.toResponse(withAuthor ?? access.page, access.role, attachments);
   }
 
   async updatePage(
@@ -208,7 +232,9 @@ export class PagesService {
     }
 
     if (dto.content !== undefined) {
-      page.content = dto.content;
+      const assignableUserIds =
+        await this.projectsService.getProjectMemberUserIds(page.projectId);
+      page.content = sanitizePageContent(dto.content, assignableUserIds);
     }
 
     if (dto.orderIndex !== undefined) {
@@ -227,8 +253,19 @@ export class PagesService {
 
     const saved = await this.pagesRepository.save(page);
     const attachments = await this.listAttachments(userId, pageId);
+    const withAuthor = await this.loadPageWithAuthor(pageId);
+    const pageWithHistory = await this.persistRecentEditor(withAuthor ?? saved);
 
-    return this.toResponse(saved, access.role, attachments);
+    this.emitPageChanged(
+      PageChangeAction.Updated,
+      access.workspaceId,
+      page.projectId,
+      page.id,
+      userId,
+      pageWithHistory,
+    );
+
+    return this.toResponse(pageWithHistory, access.role, attachments);
   }
 
   async archivePage(userId: string, pageId: string): Promise<void> {
@@ -248,6 +285,14 @@ export class PagesService {
     await this.clearProjectDefaultPageIfMatches(
       access.page.projectId,
       access.page.id,
+    );
+
+    this.emitPageChanged(
+      PageChangeAction.Archived,
+      access.workspaceId,
+      access.page.projectId,
+      access.page.id,
+      userId,
     );
   }
 
@@ -383,6 +428,14 @@ export class PagesService {
         deletedPageIds,
       );
     });
+
+    this.emitPageChanged(
+      PageChangeAction.Deleted,
+      access.workspaceId,
+      access.page.projectId,
+      pageId,
+      userId,
+    );
   }
 
   async uploadAttachment(
@@ -510,7 +563,7 @@ export class PagesService {
         userId,
         page.projectId,
       );
-      return { page, role: project.role };
+      return { page, role: project.role, workspaceId: project.workspaceId };
     } catch {
       throw new ForbiddenException(ERROR_MESSAGES.PAGE_ACCESS_DENIED);
     }
@@ -621,10 +674,131 @@ export class PagesService {
       attachments,
       createdById: page.createdById,
       updatedById: page.updatedById,
+      updatedBy: this.toAuthorPreview(page),
+      recentEditors: this.getRecentEditors(page),
       projectRole: role,
       createdAt: page.createdAt,
       updatedAt: page.updatedAt,
     };
+  }
+
+  private async loadPageWithAuthor(pageId: string): Promise<PageEntity | null> {
+    return this.pagesRepository.findOne({
+      where: { id: pageId },
+      relations: { updatedBy: true },
+    });
+  }
+
+  private toAuthorPreview(page: PageEntity): PageResponseDto['updatedBy'] {
+    return {
+      id: page.updatedBy?.id ?? page.updatedById,
+      username: page.updatedBy?.username ?? '',
+      avatarUrl: this.fileService.getFullAvatarUrl(
+        page.updatedBy?.avatarUrl ?? null,
+      ),
+    };
+  }
+
+  private emitPageChanged(
+    action: PageChangeAction,
+    workspaceId: string,
+    projectId: string,
+    pageId: string,
+    actorUserId: string,
+    page?: PageEntity,
+  ): void {
+    const actor = page ? this.toAuthorPreview(page) : undefined;
+
+    this.realtimeService.emitToWorkspace(
+      workspaceId,
+      RealtimeEvent.PAGE_CHANGED,
+      {
+        action,
+        workspaceId,
+        projectId,
+        pageId,
+        actorUserId,
+        actor: actor
+          ? {
+              id: actor.id,
+              username: actor.username,
+              avatarUrl: actor.avatarUrl,
+            }
+          : undefined,
+        updatedAt: new Date().toISOString(),
+      },
+    );
+  }
+
+  private async persistRecentEditor(page: PageEntity): Promise<PageEntity> {
+    const preview = this.toAuthorPreview(page);
+    const updatedAt = new Date().toISOString();
+    page.updatedAt = new Date(updatedAt);
+    const nextEditors = this.upsertRecentEditor(this.getRecentEditors(page), {
+      id: preview.id,
+      username: preview.username,
+      avatarUrl: preview.avatarUrl,
+      updatedAt,
+    });
+
+    await this.pagesRepository.update(
+      { id: page.id },
+      { recentEditors: nextEditors },
+    );
+
+    page.recentEditors = nextEditors;
+    return page;
+  }
+
+  private getRecentEditors(page: PageEntity): Array<{
+    id: string;
+    username: string;
+    avatarUrl: string | null;
+    updatedAt: string;
+  }> {
+    if (page.recentEditors && page.recentEditors.length > 0) {
+      return page.recentEditors;
+    }
+
+    const author = this.toAuthorPreview(page);
+
+    if (!author.id) {
+      return [];
+    }
+
+    return [
+      {
+        id: author.id,
+        username: author.username,
+        avatarUrl: author.avatarUrl,
+        updatedAt: (page.updatedAt ?? new Date()).toISOString(),
+      },
+    ];
+  }
+
+  private upsertRecentEditor(
+    editors: Array<{
+      id: string;
+      username: string;
+      avatarUrl: string | null;
+      updatedAt: string;
+    }>,
+    next: {
+      id: string;
+      username: string;
+      avatarUrl: string | null;
+      updatedAt: string;
+    },
+  ): Array<{
+    id: string;
+    username: string;
+    avatarUrl: string | null;
+    updatedAt: string;
+  }> {
+    return [next, ...editors.filter((editor) => editor.id !== next.id)].slice(
+      0,
+      8,
+    );
   }
 
   private toTreeItemResponse(page: PageEntity): PageTreeItemResponseDto {

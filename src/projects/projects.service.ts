@@ -1,13 +1,21 @@
 import {
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { ERROR_MESSAGES } from 'src/constants/error.constants';
 import { FileService } from 'src/common/services/file.service';
+import {
+  EntityChangeAction,
+  ProjectMemberChangeAction,
+  RealtimeEvent,
+} from 'src/realtime/realtime.constants';
+import { RealtimeService } from 'src/realtime/realtime.service';
 import { WorkspaceMemberEntity } from 'src/workspaces/entities/workspace-member.entity';
 import {
   WorkspaceMemberStatus,
@@ -41,6 +49,8 @@ export class ProjectsService {
     @InjectRepository(WorkspaceMemberEntity)
     private readonly workspaceMembersRepository: Repository<WorkspaceMemberEntity>,
     private readonly fileService: FileService,
+    @Inject(forwardRef(() => RealtimeService))
+    private readonly realtimeService: RealtimeService,
   ) {}
 
   async createProject(
@@ -111,6 +121,13 @@ export class ProjectsService {
       },
     );
 
+    this.emitProjectChanged(
+      EntityChangeAction.Created,
+      workspaceId,
+      project.id,
+      userId,
+    );
+
     return this.toProjectResponse(project, ProjectRole.OWNER);
   }
 
@@ -173,6 +190,13 @@ export class ProjectsService {
 
     const saved = await this.projectsRepository.save(project);
 
+    this.emitProjectChanged(
+      EntityChangeAction.Updated,
+      saved.workspaceId,
+      saved.id,
+      userId,
+    );
+
     return this.toProjectResponse(saved, access.role);
   }
 
@@ -187,6 +211,12 @@ export class ProjectsService {
     if (dto.pageId === null) {
       access.project.defaultPageId = null;
       const saved = await this.projectsRepository.save(access.project);
+      this.emitProjectChanged(
+        EntityChangeAction.Updated,
+        saved.workspaceId,
+        saved.id,
+        userId,
+      );
       return this.toProjectResponse(saved, access.role);
     }
 
@@ -207,6 +237,12 @@ export class ProjectsService {
 
     access.project.defaultPageId = page.id;
     const saved = await this.projectsRepository.save(access.project);
+    this.emitProjectChanged(
+      EntityChangeAction.Updated,
+      saved.workspaceId,
+      saved.id,
+      userId,
+    );
     return this.toProjectResponse(saved, access.role);
   }
 
@@ -215,6 +251,13 @@ export class ProjectsService {
     this.assertOwner(access);
 
     await this.projectsRepository.delete({ id: projectId });
+
+    this.emitProjectChanged(
+      EntityChangeAction.Deleted,
+      access.project.workspaceId,
+      projectId,
+      userId,
+    );
   }
 
   async listMembers(
@@ -230,6 +273,18 @@ export class ProjectsService {
     });
 
     return members.map((member) => this.toMemberResponse(member));
+  }
+
+  async getProjectMemberUserIds(projectId: string): Promise<Set<string>> {
+    const members = await this.projectMembersRepository.find({
+      where: { projectId },
+      select: {
+        id: true,
+        userId: true,
+      },
+    });
+
+    return new Set(members.map((member) => member.userId));
   }
 
   async addMember(
@@ -276,6 +331,14 @@ export class ProjectsService {
       relations: { user: true },
     });
 
+    this.emitProjectMemberChanged(
+      ProjectMemberChangeAction.Added,
+      access.project.workspaceId,
+      projectId,
+      userId,
+      dto.userId,
+    );
+
     return this.toMemberResponse(withUser ?? saved);
   }
 
@@ -304,6 +367,14 @@ export class ProjectsService {
     target.role = dto.role;
     const saved = await this.projectMembersRepository.save(target);
 
+    this.emitProjectMemberChanged(
+      ProjectMemberChangeAction.Updated,
+      access.project.workspaceId,
+      projectId,
+      userId,
+      targetUserId,
+    );
+
     return this.toMemberResponse(saved);
   }
 
@@ -330,6 +401,14 @@ export class ProjectsService {
     }
 
     await this.projectMembersRepository.delete({ id: target.id });
+
+    this.emitProjectMemberChanged(
+      ProjectMemberChangeAction.Removed,
+      access.project.workspaceId,
+      projectId,
+      userId,
+      targetUserId,
+    );
   }
 
   private async resolveAccess(
@@ -472,5 +551,44 @@ export class ProjectsService {
       role: member.role,
       createdAt: member.createdAt,
     };
+  }
+
+  private emitProjectChanged(
+    action: EntityChangeAction,
+    workspaceId: string,
+    projectId: string,
+    actorUserId: string,
+  ): void {
+    this.realtimeService.emitToWorkspace(
+      workspaceId,
+      RealtimeEvent.PROJECT_CHANGED,
+      {
+        action,
+        workspaceId,
+        projectId,
+        actorUserId,
+      },
+    );
+  }
+
+  private emitProjectMemberChanged(
+    action: ProjectMemberChangeAction,
+    workspaceId: string,
+    projectId: string,
+    actorUserId: string,
+    targetUserId: string,
+  ): void {
+    this.realtimeService.emitToWorkspaceAndUsers(
+      workspaceId,
+      [targetUserId],
+      RealtimeEvent.PROJECT_MEMBER_CHANGED,
+      {
+        action,
+        workspaceId,
+        projectId,
+        actorUserId,
+        targetUserId,
+      },
+    );
   }
 }

@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { getTypeOrmConfig } from './config/typeorm.config';
 import { PagesModule } from './pages/pages.module';
 import { ProjectsModule } from './projects/projects.module';
+import { RealtimeModule } from './realtime/realtime.module';
 import { UsersModule } from './users/users.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
 
@@ -25,6 +26,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
     WorkspacesModule,
     ProjectsModule,
     PagesModule,
+    RealtimeModule,
   ],
   controllers: [AppController],
   providers: [AppService],
