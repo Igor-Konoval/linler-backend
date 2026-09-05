@@ -98,6 +98,14 @@ export class PageEntity {
   @Column({ type: 'jsonb' })
   content!: Record<string, unknown>;
 
+  @Column({ name: 'recent_editors', type: 'jsonb', nullable: true })
+  recentEditors!: Array<{
+    id: string;
+    username: string;
+    avatarUrl: string | null;
+    updatedAt: string;
+  }> | null;
+
   @Column({ name: 'order_index', type: 'int', default: 0 })
   orderIndex!: number;
 
