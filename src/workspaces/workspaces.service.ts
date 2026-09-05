@@ -1,8 +1,10 @@
 import {
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomBytes } from 'node:crypto';
@@ -10,6 +12,13 @@ import { In, IsNull, MoreThan } from 'typeorm';
 import type { EntityManager, Repository } from 'typeorm';
 import { ERROR_MESSAGES } from 'src/constants/error.constants';
 import { FileService } from 'src/common/services/file.service';
+import {
+  EntityChangeAction,
+  RealtimeEvent,
+  WorkspaceInvitationChangeAction,
+  WorkspaceMemberChangeAction,
+} from 'src/realtime/realtime.constants';
+import { RealtimeService } from 'src/realtime/realtime.service';
 import { hashToken } from 'src/modules/auth/utils/token-hash.utils';
 import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
 import { buildPageMeta } from 'src/common/utils/pagination.util';
@@ -51,6 +60,8 @@ export class WorkspacesService {
     @InjectRepository(WorkspaceInvitationEntity)
     private readonly invitationsRepository: Repository<WorkspaceInvitationEntity>,
     private readonly fileService: FileService,
+    @Inject(forwardRef(() => RealtimeService))
+    private readonly realtimeService: RealtimeService,
   ) {}
 
   async ensurePersonalWorkspace(
@@ -65,6 +76,12 @@ export class WorkspacesService {
     dto: CreateWorkspaceDto,
   ): Promise<WorkspaceResponseDto> {
     const workspace = await this.createWorkspaceWithOwner(userId, dto.name);
+
+    this.realtimeService.emitToUser(userId, RealtimeEvent.WORKSPACE_CHANGED, {
+      action: EntityChangeAction.Created,
+      workspaceId: workspace.id,
+      actorUserId: userId,
+    });
 
     return this.toWorkspaceResponse(workspace, WorkspaceRole.OWNER);
   }
@@ -129,6 +146,16 @@ export class WorkspacesService {
 
     const saved = await this.workspacesRepository.save(workspace);
 
+    this.realtimeService.emitToWorkspace(
+      workspaceId,
+      RealtimeEvent.WORKSPACE_CHANGED,
+      {
+        action: EntityChangeAction.Updated,
+        workspaceId,
+        actorUserId: userId,
+      },
+    );
+
     return this.toWorkspaceResponse(saved, membership.role);
   }
 
@@ -142,7 +169,20 @@ export class WorkspacesService {
       throw new ForbiddenException(ERROR_MESSAGES.WORKSPACE_INSUFFICIENT_ROLE);
     }
 
+    const memberUserIds = await this.getActiveMemberUserIds(workspaceId);
+
     await this.workspacesRepository.delete({ id: workspaceId });
+
+    this.realtimeService.emitToWorkspaceAndUsers(
+      workspaceId,
+      memberUserIds,
+      RealtimeEvent.WORKSPACE_CHANGED,
+      {
+        action: EntityChangeAction.Deleted,
+        workspaceId,
+        actorUserId: userId,
+      },
+    );
   }
 
   async listMembers(
@@ -202,6 +242,17 @@ export class WorkspacesService {
 
     const saved = await this.membersRepository.save(target);
 
+    this.realtimeService.emitToWorkspace(
+      workspaceId,
+      RealtimeEvent.WORKSPACE_MEMBER_CHANGED,
+      {
+        action: WorkspaceMemberChangeAction.Updated,
+        workspaceId,
+        actorUserId: actorUserId,
+        targetUserId,
+      },
+    );
+
     return this.toMemberResponse(saved);
   }
 
@@ -229,6 +280,18 @@ export class WorkspacesService {
     }
 
     await this.membersRepository.delete({ id: target.id });
+
+    this.realtimeService.emitToWorkspaceAndUsers(
+      workspaceId,
+      [targetUserId],
+      RealtimeEvent.WORKSPACE_MEMBER_CHANGED,
+      {
+        action: WorkspaceMemberChangeAction.Removed,
+        workspaceId,
+        actorUserId: actorUserId,
+        targetUserId,
+      },
+    );
   }
 
   async leaveWorkspace(workspaceId: string, userId: string): Promise<void> {
@@ -242,6 +305,18 @@ export class WorkspacesService {
     }
 
     await this.membersRepository.delete({ id: membership.id });
+
+    this.realtimeService.emitToWorkspaceAndUsers(
+      workspaceId,
+      [userId],
+      RealtimeEvent.WORKSPACE_MEMBER_CHANGED,
+      {
+        action: WorkspaceMemberChangeAction.Removed,
+        workspaceId,
+        actorUserId: userId,
+        targetUserId: userId,
+      },
+    );
   }
 
   async createInvitation(
@@ -299,6 +374,16 @@ export class WorkspacesService {
     });
 
     const saved = await this.invitationsRepository.save(invitation);
+
+    this.realtimeService.emitToWorkspace(
+      workspaceId,
+      RealtimeEvent.WORKSPACE_INVITATION_CHANGED,
+      {
+        action: WorkspaceInvitationChangeAction.Created,
+        workspaceId,
+        actorUserId: actorUserId,
+      },
+    );
 
     return {
       ...this.toInvitationResponse(saved),
@@ -361,6 +446,16 @@ export class WorkspacesService {
 
     invitation.status = WorkspaceInvitationStatus.REVOKED;
     await this.invitationsRepository.save(invitation);
+
+    this.realtimeService.emitToWorkspace(
+      workspaceId,
+      RealtimeEvent.WORKSPACE_INVITATION_CHANGED,
+      {
+        action: WorkspaceInvitationChangeAction.Revoked,
+        workspaceId,
+        actorUserId: userId,
+      },
+    );
   }
 
   async findMyInvitations(
@@ -494,6 +589,16 @@ export class WorkspacesService {
 
     invitation.status = WorkspaceInvitationStatus.DECLINED;
     await this.invitationsRepository.save(invitation);
+
+    this.realtimeService.emitToWorkspace(
+      invitation.workspaceId,
+      RealtimeEvent.WORKSPACE_INVITATION_CHANGED,
+      {
+        action: WorkspaceInvitationChangeAction.Declined,
+        workspaceId: invitation.workspaceId,
+        actorUserId: invitation.invitedById,
+      },
+    );
   }
 
   private async applyInvitationAcceptance(
@@ -553,6 +658,34 @@ export class WorkspacesService {
     if (!workspace) {
       throw new NotFoundException(ERROR_MESSAGES.WORKSPACE_NOT_FOUND);
     }
+
+    this.realtimeService.emitToWorkspaceAndUsers(
+      workspace.id,
+      [userId],
+      RealtimeEvent.WORKSPACE_MEMBER_CHANGED,
+      {
+        action: WorkspaceMemberChangeAction.Joined,
+        workspaceId: workspace.id,
+        actorUserId: userId,
+        targetUserId: userId,
+      },
+    );
+
+    this.realtimeService.emitToUser(userId, RealtimeEvent.WORKSPACE_CHANGED, {
+      action: EntityChangeAction.Created,
+      workspaceId: workspace.id,
+      actorUserId: userId,
+    });
+
+    this.realtimeService.emitToWorkspace(
+      workspace.id,
+      RealtimeEvent.WORKSPACE_INVITATION_CHANGED,
+      {
+        action: WorkspaceInvitationChangeAction.Accepted,
+        workspaceId: workspace.id,
+        actorUserId: userId,
+      },
+    );
 
     return this.toWorkspaceResponse(workspace, role);
   }
@@ -650,6 +783,25 @@ export class WorkspacesService {
     }
 
     return membership;
+  }
+
+  async assertActiveMember(workspaceId: string, userId: string): Promise<void> {
+    await this.getActiveMembershipOrThrow(workspaceId, userId);
+  }
+
+  private async getActiveMemberUserIds(workspaceId: string): Promise<string[]> {
+    const members = await this.membersRepository.find({
+      where: {
+        workspaceId,
+        status: WorkspaceMemberStatus.ACTIVE,
+      },
+      select: {
+        id: true,
+        userId: true,
+      },
+    });
+
+    return members.map((member) => member.userId);
   }
 
   private assertManager(membership: WorkspaceMemberEntity): void {
