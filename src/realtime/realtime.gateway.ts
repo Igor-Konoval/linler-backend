@@ -17,6 +17,7 @@ import { WorkspacesService } from 'src/workspaces/workspaces.service';
 import { parseCookieValue } from './parse-cookie.util';
 import {
   REALTIME_NAMESPACE,
+  REALTIME_SOCKET_PATH,
   RealtimeEvent,
   type RealtimeEventName,
   userRoom,
@@ -32,10 +33,7 @@ import { getSocketAuth, patchSocketAuth } from './socket-auth.util';
 
 @WebSocketGateway({
   namespace: REALTIME_NAMESPACE,
-  cors: {
-    origin: true,
-    credentials: true,
-  },
+  path: REALTIME_SOCKET_PATH,
 })
 export class RealtimeGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect

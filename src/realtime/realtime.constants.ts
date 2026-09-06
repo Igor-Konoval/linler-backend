@@ -1,4 +1,5 @@
 export const REALTIME_NAMESPACE = '/realtime';
+export const REALTIME_SOCKET_PATH = '/api/socket.io';
 
 export const RealtimeEvent = {
   WORKSPACE_JOIN: 'workspace:join',
@@ -16,6 +17,7 @@ export const RealtimeEvent = {
   PAGE_AWARENESS_SYNC: 'page:awareness-sync',
   PAGE_AWARENESS_REQUEST: 'page:awareness-request',
   TASK_BOARD_CHANGED: 'task-board:changed',
+  NOTIFICATION_CREATED: 'notification:created',
 } as const;
 
 export type RealtimeEventName =

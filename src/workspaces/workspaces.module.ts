@@ -2,7 +2,9 @@ import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from 'src/auth/auth.module';
 import { FileService } from 'src/common/services/file.service';
+import { NotificationsModule } from 'src/notifications/notifications.module';
 import { RealtimeModule } from 'src/realtime/realtime.module';
+import { UsersModule } from 'src/users/users.module';
 import { WorkspacesController } from './workspaces.controller';
 import { WorkspacesService } from './workspaces.service';
 import { WorkspaceEntity } from './entities/workspace.entity';
@@ -18,6 +20,8 @@ import { WorkspaceInvitationEntity } from './entities/workspace-invitation.entit
     ]),
     forwardRef(() => AuthModule),
     forwardRef(() => RealtimeModule),
+    UsersModule,
+    forwardRef(() => NotificationsModule),
   ],
   controllers: [WorkspacesController],
   providers: [WorkspacesService, FileService],
