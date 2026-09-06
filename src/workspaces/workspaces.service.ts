@@ -18,7 +18,9 @@ import {
   WorkspaceInvitationChangeAction,
   WorkspaceMemberChangeAction,
 } from 'src/realtime/realtime.constants';
+import { NotificationsService } from 'src/notifications/notifications.service';
 import { RealtimeService } from 'src/realtime/realtime.service';
+import { UsersService } from 'src/users/users.service';
 import { hashToken } from 'src/modules/auth/utils/token-hash.utils';
 import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
 import { buildPageMeta } from 'src/common/utils/pagination.util';
@@ -62,6 +64,9 @@ export class WorkspacesService {
     private readonly fileService: FileService,
     @Inject(forwardRef(() => RealtimeService))
     private readonly realtimeService: RealtimeService,
+    private readonly usersService: UsersService,
+    @Inject(forwardRef(() => NotificationsService))
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async ensurePersonalWorkspace(
@@ -330,7 +335,7 @@ export class WorkspacesService {
     );
     this.assertManager(actorMembership);
 
-    const email = dto.email.toLowerCase();
+    const email = dto.email.trim().toLowerCase();
 
     const existingMember = await this.membersRepository
       .createQueryBuilder('member')
@@ -375,14 +380,11 @@ export class WorkspacesService {
 
     const saved = await this.invitationsRepository.save(invitation);
 
-    this.realtimeService.emitToWorkspace(
+    await this.emitInvitationChanged(
       workspaceId,
-      RealtimeEvent.WORKSPACE_INVITATION_CHANGED,
-      {
-        action: WorkspaceInvitationChangeAction.Created,
-        workspaceId,
-        actorUserId: actorUserId,
-      },
+      actorUserId,
+      WorkspaceInvitationChangeAction.Created,
+      email,
     );
 
     return {
@@ -447,14 +449,11 @@ export class WorkspacesService {
     invitation.status = WorkspaceInvitationStatus.REVOKED;
     await this.invitationsRepository.save(invitation);
 
-    this.realtimeService.emitToWorkspace(
+    await this.emitInvitationChanged(
       workspaceId,
-      RealtimeEvent.WORKSPACE_INVITATION_CHANGED,
-      {
-        action: WorkspaceInvitationChangeAction.Revoked,
-        workspaceId,
-        actorUserId: userId,
-      },
+      userId,
+      WorkspaceInvitationChangeAction.Revoked,
+      invitation.email,
     );
   }
 
@@ -462,7 +461,7 @@ export class WorkspacesService {
     userEmail: string,
     pagination: PaginationQueryDto,
   ): Promise<MyInvitationListResponseDto> {
-    const email = userEmail.toLowerCase();
+    const email = userEmail.trim().toLowerCase();
     const { page, limit } = pagination;
 
     const [invitations, totalItems] =
@@ -590,14 +589,11 @@ export class WorkspacesService {
     invitation.status = WorkspaceInvitationStatus.DECLINED;
     await this.invitationsRepository.save(invitation);
 
-    this.realtimeService.emitToWorkspace(
+    await this.emitInvitationChanged(
       invitation.workspaceId,
-      RealtimeEvent.WORKSPACE_INVITATION_CHANGED,
-      {
-        action: WorkspaceInvitationChangeAction.Declined,
-        workspaceId: invitation.workspaceId,
-        actorUserId: invitation.invitedById,
-      },
+      invitation.invitedById,
+      WorkspaceInvitationChangeAction.Declined,
+      invitation.email,
     );
   }
 
@@ -659,9 +655,11 @@ export class WorkspacesService {
       throw new NotFoundException(ERROR_MESSAGES.WORKSPACE_NOT_FOUND);
     }
 
+    const memberUserIds = await this.getActiveMemberUserIds(workspace.id);
+
     this.realtimeService.emitToWorkspaceAndUsers(
       workspace.id,
-      [userId],
+      memberUserIds,
       RealtimeEvent.WORKSPACE_MEMBER_CHANGED,
       {
         action: WorkspaceMemberChangeAction.Joined,
@@ -677,15 +675,19 @@ export class WorkspacesService {
       actorUserId: userId,
     });
 
-    this.realtimeService.emitToWorkspace(
+    await this.emitInvitationChanged(
       workspace.id,
-      RealtimeEvent.WORKSPACE_INVITATION_CHANGED,
-      {
-        action: WorkspaceInvitationChangeAction.Accepted,
+      userId,
+      WorkspaceInvitationChangeAction.Accepted,
+      invitation.email,
+    );
+
+    void this.notificationsService
+      .notifyWorkspaceMemberJoined({
         workspaceId: workspace.id,
         actorUserId: userId,
-      },
-    );
+      })
+      .catch(() => undefined);
 
     return this.toWorkspaceResponse(workspace, role);
   }
@@ -787,6 +789,35 @@ export class WorkspacesService {
 
   async assertActiveMember(workspaceId: string, userId: string): Promise<void> {
     await this.getActiveMembershipOrThrow(workspaceId, userId);
+  }
+
+  private async emitInvitationChanged(
+    workspaceId: string,
+    actorUserId: string,
+    action: WorkspaceInvitationChangeAction,
+    inviteeEmail: string,
+  ): Promise<void> {
+    const payload = {
+      action,
+      workspaceId,
+      actorUserId,
+    };
+
+    this.realtimeService.emitToWorkspace(
+      workspaceId,
+      RealtimeEvent.WORKSPACE_INVITATION_CHANGED,
+      payload,
+    );
+
+    const invitee = await this.usersService.findByEmailIgnoreCase(inviteeEmail);
+
+    if (invitee) {
+      this.realtimeService.emitToUser(
+        invitee.id,
+        RealtimeEvent.WORKSPACE_INVITATION_CHANGED,
+        payload,
+      );
+    }
   }
 
   private async getActiveMemberUserIds(workspaceId: string): Promise<string[]> {

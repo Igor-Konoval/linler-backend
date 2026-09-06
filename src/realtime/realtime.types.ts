@@ -102,3 +102,14 @@ export type TaskBoardChangedPayload = {
   board: unknown;
   actorUserId: string;
 };
+
+export type NotificationCreatedPayload = {
+  notification: {
+    id: string;
+    type: string;
+    workspaceId: string;
+    payload: Record<string, unknown>;
+    isRead: boolean;
+    createdAt: Date | string;
+  };
+};

@@ -14,6 +14,7 @@ import {
   PageChangeAction,
   RealtimeEvent,
 } from 'src/realtime/realtime.constants';
+import { NotificationsService } from 'src/notifications/notifications.service';
 import { RealtimeService } from 'src/realtime/realtime.service';
 import { ProjectsService } from 'src/projects/projects.service';
 import { ProjectRole } from 'src/projects/enums/project.enums';
@@ -53,6 +54,8 @@ export class PagesService {
     private readonly fileService: FileService,
     @Inject(forwardRef(() => RealtimeService))
     private readonly realtimeService: RealtimeService,
+    @Inject(forwardRef(() => NotificationsService))
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async createPage(
@@ -231,6 +234,9 @@ export class PagesService {
       }
     }
 
+    const previousContent =
+      dto.content !== undefined ? page.content : undefined;
+
     if (dto.content !== undefined) {
       const assignableUserIds =
         await this.projectsService.getProjectMemberUserIds(page.projectId);
@@ -264,6 +270,20 @@ export class PagesService {
       userId,
       pageWithHistory,
     );
+
+    if (previousContent !== undefined) {
+      void this.notificationsService
+        .notifyTaskBoardChanges({
+          workspaceId: access.workspaceId,
+          projectId: page.projectId,
+          pageId: page.id,
+          pageTitle: page.title,
+          actorUserId: userId,
+          previousContent,
+          nextContent: saved.content,
+        })
+        .catch(() => undefined);
+    }
 
     return this.toResponse(pageWithHistory, access.role, attachments);
   }

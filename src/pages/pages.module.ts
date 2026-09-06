@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from 'src/auth/auth.module';
 import { FileService } from 'src/common/services/file.service';
+import { NotificationsModule } from 'src/notifications/notifications.module';
 import { ProjectsModule } from 'src/projects/projects.module';
 import { RealtimeModule } from 'src/realtime/realtime.module';
 import { PageAttachmentEntity } from './entities/page-attachment.entity';
@@ -16,6 +17,7 @@ import { ProjectPagesController } from './project-pages.controller';
     AuthModule,
     ProjectsModule,
     forwardRef(() => RealtimeModule),
+    forwardRef(() => NotificationsModule),
   ],
   controllers: [PagesController, ProjectPagesController],
   providers: [PagesService, FileService],
