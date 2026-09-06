@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { IoAdapter } from '@nestjs/platform-socket.io';
+import { RealtimeIoAdapter } from './realtime/realtime-io.adapter';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import cookieParser from 'cookie-parser';
@@ -21,7 +21,7 @@ import {
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  app.useWebSocketAdapter(new IoAdapter(app));
+  app.useWebSocketAdapter(new RealtimeIoAdapter(app));
   app.set('trust proxy', 1);
 
   app.setGlobalPrefix('api');

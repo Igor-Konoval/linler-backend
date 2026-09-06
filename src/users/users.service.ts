@@ -46,6 +46,15 @@ export class UsersService {
     });
   }
 
+  async findByEmailIgnoreCase(email: string): Promise<UserEntity | null> {
+    return this.usersRepository
+      .createQueryBuilder('user')
+      .where('LOWER(user.email) = :email', {
+        email: email.trim().toLowerCase(),
+      })
+      .getOne();
+  }
+
   async findByEmailWithPassword(email: string): Promise<UserEntity | null> {
     return this.usersRepository
       .createQueryBuilder('user')

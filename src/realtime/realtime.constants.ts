@@ -17,6 +17,7 @@ export const RealtimeEvent = {
   PAGE_AWARENESS_SYNC: 'page:awareness-sync',
   PAGE_AWARENESS_REQUEST: 'page:awareness-request',
   TASK_BOARD_CHANGED: 'task-board:changed',
+  NOTIFICATION_CREATED: 'notification:created',
 } as const;
 
 export type RealtimeEventName =

@@ -9,6 +9,7 @@ import { PagesModule } from './pages/pages.module';
 import { ProjectsModule } from './projects/projects.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { UsersModule } from './users/users.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { WorkspacesModule } from './workspaces/workspaces.module';
 
 @Module({
@@ -24,6 +25,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
     AuthModule,
     UsersModule,
     WorkspacesModule,
+    NotificationsModule,
     ProjectsModule,
     PagesModule,
     RealtimeModule,
