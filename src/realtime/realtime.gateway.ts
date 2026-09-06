@@ -34,6 +34,10 @@ import { getSocketAuth, patchSocketAuth } from './socket-auth.util';
 @WebSocketGateway({
   namespace: REALTIME_NAMESPACE,
   path: REALTIME_SOCKET_PATH,
+  cors: {
+    origin: true,
+    credentials: true,
+  },
 })
 export class RealtimeGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
