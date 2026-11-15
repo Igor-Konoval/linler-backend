@@ -5,6 +5,9 @@ export interface AuthUser {
   email: string;
   username: string;
   avatarUrl: string | null;
+  subscriptionActive: boolean;
+  subscriptionCancelAtPeriodEnd: boolean;
+  subscriptionCurrentPeriodEnd: string | null;
 }
 
 export type RequestWithUser = Request & {

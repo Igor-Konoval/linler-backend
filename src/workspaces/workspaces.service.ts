@@ -21,6 +21,7 @@ import {
 import { NotificationsService } from 'src/notifications/notifications.service';
 import { RealtimeService } from 'src/realtime/realtime.service';
 import { UsersService } from 'src/users/users.service';
+import { isSubscriptionActive } from 'src/billing/subscription.util';
 import { hashToken } from 'src/modules/auth/utils/token-hash.utils';
 import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
 import { buildPageMeta } from 'src/common/utils/pagination.util';
@@ -867,6 +868,9 @@ export class WorkspacesService {
       avatarUrl: this.fileService.getFullAvatarUrl(
         member.user?.avatarUrl ?? null,
       ),
+      subscriptionActive: member.user
+        ? isSubscriptionActive(member.user)
+        : false,
       role: member.role,
       status: member.status,
       joinedAt: member.joinedAt,

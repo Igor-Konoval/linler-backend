@@ -402,6 +402,7 @@ export class RealtimeGateway
       id: user.id,
       username: user.username,
       avatarUrl: user.avatarUrl,
+      subscriptionActive: user.subscriptionActive,
     };
   }
 }

@@ -20,4 +20,13 @@ export class AuthUserResponseDto {
     example: 'https://example.com/avatar.png',
   })
   avatarUrl!: string | null;
+
+  @ApiProperty({ example: false })
+  subscriptionActive!: boolean;
+
+  @ApiProperty({ example: false })
+  subscriptionCancelAtPeriodEnd!: boolean;
+
+  @ApiProperty({ example: null, nullable: true })
+  subscriptionCurrentPeriodEnd!: string | null;
 }

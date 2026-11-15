@@ -22,6 +22,7 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UserProfileDto } from './dto/user-profile.dto';
 import { ERROR_MESSAGES } from 'src/constants/error.constants';
 import { UserEntity } from './entities/user.entity';
+import { toSubscriptionState } from 'src/billing/subscription.util';
 
 @ApiTags('users')
 @Controller('users')
@@ -53,12 +54,7 @@ export class UsersController {
   ): Promise<UserProfileDto> {
     const updatedUser = await this.usersService.updateProfile(user.id, dto);
 
-    return {
-      id: updatedUser.id,
-      email: updatedUser.email,
-      username: updatedUser.username,
-      avatarUrl: this.fileService.getFullAvatarUrl(updatedUser.avatarUrl),
-    };
+    return this.toProfileDto(updatedUser);
   }
 
   @ApiAuth()
@@ -99,12 +95,7 @@ export class UsersController {
       avatarUrl,
     );
 
-    return {
-      id: updatedUser.id,
-      email: updatedUser.email,
-      username: updatedUser.username,
-      avatarUrl: this.fileService.getFullAvatarUrl(updatedUser.avatarUrl),
-    };
+    return this.toProfileDto(updatedUser);
   }
 
   @ApiAuth()
@@ -132,6 +123,7 @@ export class UsersController {
       email: user.email,
       username: user.username,
       avatarUrl: this.fileService.getFullAvatarUrl(user.avatarUrl),
+      ...toSubscriptionState(user),
     };
   }
 }

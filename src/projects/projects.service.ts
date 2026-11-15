@@ -10,6 +10,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { ERROR_MESSAGES } from 'src/constants/error.constants';
 import { FileService } from 'src/common/services/file.service';
+import { isSubscriptionActive } from 'src/billing/subscription.util';
 import {
   EntityChangeAction,
   ProjectMemberChangeAction,
@@ -548,6 +549,9 @@ export class ProjectsService {
       avatarUrl: this.fileService.getFullAvatarUrl(
         member.user?.avatarUrl ?? null,
       ),
+      subscriptionActive: member.user
+        ? isSubscriptionActive(member.user)
+        : false,
       role: member.role,
       createdAt: member.createdAt,
     };

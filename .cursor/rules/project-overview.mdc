@@ -1,0 +1,90 @@
+---
+description: Linler project domain model, architecture and conventions (Notion-like backend)
+alwaysApply: true
+---
+
+# Linler — Notion-like backend
+
+Simplified Notion clone. Backend only (NestJS 11 + TypeORM + PostgreSQL, package manager: pnpm).
+TypeORM runs with `synchronize: true` (no migrations yet — schema auto-syncs from entities).
+
+## Teaching mode (IMPORTANT)
+
+The author is a backend beginner building their first project and is learning NestJS/TypeORM
+while we build. For every change:
+- Add clear teaching comments IN RUSSIAN in the code that explain the WHY of non-obvious framework
+  mechanics (TypeORM relations: `@ManyToOne`/`@OneToMany`, the two decorator callbacks,
+  `@JoinColumn`, owning vs inverse side; NestJS pipes/guards/DI/`forwardRef`, validation flow,
+  decorators). Comments go in entities, services, controllers, enums and DTOs.
+- When introducing a new concept, explain it in the reply in plain language, referencing the exact
+  file/lines. Prefer a short "why it works this way" over just "what it does".
+- This overrides the usual "no narration comments" guidance: educational comments are wanted here.
+
+## API response conventions
+
+- Array/list endpoints must return an OBJECT envelope, never a bare array:
+  `{ <itemsName>: [...] }` — e.g. `{ workspaces: [...] }`, `{ members: [...] }`,
+  `{ invitations: [...] }`, `{ projects: [...] }`. Wrap at the controller boundary and use a
+  dedicated `*ListResponseDto` so Swagger shows the shape. Single-object responses are returned as-is.
+
+## Domain hierarchy
+
+```
+Workspace
+  └── Projects
+        ├── Project A
+        │     ├── page
+        │     └── page
+        │           └── page (infinite nesting via parent_page_id)
+        └── Project B
+              └── page
+```
+
+- **Workspace** — top-level account/team container. Holds users, roles, projects, invitations, notifications.
+- **Project** — container inside a workspace, shown as a top sidebar item. `visibility`: `PRIVATE` (owner + explicit project_members) or `WORKSPACE` (all active workspace members). Default = PRIVATE.
+- **Page** — document inside a Project. Always belongs to a Project. `parent_page_id` (nullable) enables infinite nesting. Content stored as `jsonb` blocks.
+
+## Access model
+
+- A user can belong to multiple workspaces; each membership has a role.
+- `workspace_members` roles: `OWNER | ADMIN | MEMBER | VIEWER`; status: `ACTIVE | SUSPENDED | LEFT`. Unique `(workspace_id, user_id)`.
+- `project_members` roles: `OWNER | EDITOR | VIEWER`. Unique `(project_id, user_id)`. Lets a plain workspace MEMBER be EDITOR/VIEWER on a specific private project.
+- Private projects are hidden from the workspace; only owner + project members see them. Workspace OWNER/ADMIN can administer/see project metadata in admin/moderation mode.
+- Creating a private project in someone's workspace requires `CREATE_PRIVATE_PROJECT` permission.
+- On registration: auto-create a workspace ("<Username>'s Workspace") and add the user to `workspace_members` as `OWNER`.
+
+## Data model (planned tables)
+
+users, user_sessions (done) ·
+workspaces, workspace_members, workspace_invitations ·
+projects, project_members ·
+pages ·
+tasks, task_statuses, task_assignees, task_comments, task_activity_logs ·
+notifications
+
+Key columns:
+- **workspaces**: id, name, slug, owner_id, created_at, updated_at
+- **workspace_members**: id, workspace_id, user_id, role, status, joined_at, updated_at
+- **projects**: id, workspace_id, owner_id, name, icon, description, visibility, order_index, is_archived, created_at, updated_at
+- **project_members**: id, project_id, user_id, role, created_at, updated_at
+- **pages**: id, project_id, parent_page_id, created_by_id, updated_by_id, title, icon, content (jsonb), order_index, is_archived, created_at, updated_at
+
+Pages later power 3 table views: kanban/drag-by-date board, table view, and column view.
+
+## Code conventions (match existing code)
+
+- Entities: `@Entity('snake_case_table')`, uuid PK via `@PrimaryGeneratedColumn('uuid')`, snake_case column `name`, `@CreateDateColumn({ name: 'created_at' })` / `@UpdateDateColumn`.
+- One Nest module per domain (`src/<domain>/`): `*.module.ts`, `*.controller.ts`, `*.service.ts`, `entities/`, `dto/`.
+- Services inject repos via `@InjectRepository`. Throw Nest exceptions with messages from `src/constants/error.constants.ts`.
+- Protect routes with `@UseGuards(AccessTokenGuard)` + `@ApiAuth()`, read user via `@CurrentUser()`.
+
+## Branch strategy
+
+Build the model incrementally, one domain per branch (easier review + deployable steps).
+- **workspace domain** (done): workspaces, workspace_members, workspace_invitations + auto-create-workspace-on-register + in-app invitation inbox (accept by id/token, decline).
+- **projects domain** (done): projects, project_members with visibility PRIVATE/WORKSPACE.
+  Access model (highest wins): workspace OWNER/ADMIN -> project OWNER (moderation);
+  explicit project_members role; WORKSPACE visibility -> EDITOR (VIEWER for workspace viewers);
+  PRIVATE with none of the above -> hidden.
+- Later branches: pages → tasks/* → notifications.
+- Email sending for invitations is intentionally deferred (in-app inbox covers it).

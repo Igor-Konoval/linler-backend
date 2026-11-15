@@ -20,6 +20,9 @@ export const ERROR_MESSAGES = {
   // User
   USER_NOT_FOUND: 'User not found',
   USER_ALREADY_EXISTS: 'User with this email already exists',
+  BILLING_NOT_CONFIGURED:
+    'Stripe test billing is not configured. Add a test secret key and price id.',
+  BILLING_TEST_MODE_ONLY: 'Only Stripe test keys are allowed.',
 
   // Workspace
   WORKSPACE_NOT_FOUND: 'Workspace not found',

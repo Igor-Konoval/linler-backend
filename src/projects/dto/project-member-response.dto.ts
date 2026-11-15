@@ -17,6 +17,9 @@ export class ProjectMemberResponseDto {
   @ApiProperty({ example: 'https://example.com/avatar.png', nullable: true })
   avatarUrl!: string | null;
 
+  @ApiProperty({ example: false })
+  subscriptionActive!: boolean;
+
   @ApiProperty({ enum: ProjectRole, example: ProjectRole.EDITOR })
   role!: ProjectRole;
 
