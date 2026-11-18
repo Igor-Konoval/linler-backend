@@ -168,6 +168,65 @@ export class ProjectsService {
     return result;
   }
 
+  async listProjectsForAssistant(
+    userId: string,
+    workspaceId: string,
+  ): Promise<
+    Array<{
+      id: string;
+      name: string;
+      visibility: ProjectVisibility;
+      role: ProjectRole;
+    }>
+  > {
+    const workspaceMembership = await this.getActiveWorkspaceMembership(
+      workspaceId,
+      userId,
+    );
+
+    const projects = await this.projectsRepository.find({
+      where: { workspaceId, isArchived: false },
+      order: { orderIndex: 'ASC', createdAt: 'ASC' },
+    });
+    const membershipByProjectId = await this.getProjectMembershipMap(
+      userId,
+      projects.map((project) => project.id),
+    );
+    const visible: Array<{
+      id: string;
+      name: string;
+      visibility: ProjectVisibility;
+      role: ProjectRole;
+    }> = [];
+
+    for (const project of projects) {
+      const membership = membershipByProjectId.get(project.id);
+      const isPrivate = project.visibility === ProjectVisibility.PRIVATE;
+      const isOwner = project.ownerId === userId;
+
+      if (isPrivate && !membership && !isOwner) {
+        continue;
+      }
+
+      const role =
+        membership?.role ??
+        (isOwner
+          ? ProjectRole.OWNER
+          : workspaceMembership.role === WorkspaceRole.VIEWER
+            ? ProjectRole.VIEWER
+            : ProjectRole.EDITOR);
+
+      visible.push({
+        id: project.id,
+        name: project.name,
+        visibility: project.visibility,
+        role,
+      });
+    }
+
+    return visible;
+  }
+
   async getProject(
     userId: string,
     projectId: string,
