@@ -1,25 +1,47 @@
 name: Backend CD
 
 on:
-  push:
+  workflow_run:
+    workflows: ['Backend CI']
+    types: [completed]
     branches: [main]
 
-  workflow_dispatch:
+env:
+  IMAGE: ghcr.io/igor-konoval/linler-backend
+  AWS_REGION: eu-north-1
+  EC2_INSTANCE_ID: i-03054c1cab6f30914
 
 jobs:
-  build-and-push:
-    runs-on: ubuntu-latest
+  build:
+    name: Build (${{ matrix.platform }})
+    if: github.event.workflow_run.conclusion == 'success'
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+
+    runs-on: ${{ matrix.runner }}
 
     permissions:
       contents: read
       packages: write
 
     steps:
+      - name: Prepare
+        run: |
+          platform=${{ matrix.platform }}
+          echo "PLATFORM_PAIR=${platform//\//-}" >> "$GITHUB_ENV"
+
       - name: Checkout
         uses: actions/checkout@v7
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -31,32 +53,176 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push
+      - name: Build and push by digest
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: |
-            ghcr.io/igor-konoval/linler-backend:latest
-            ghcr.io/igor-konoval/linler-backend:${{ github.sha }}
+          platforms: ${{ matrix.platform }}
+          provenance: false
+          cache-from: type=gha,scope=${{ env.PLATFORM_PAIR }}
+          cache-to: type=gha,mode=max,scope=${{ env.PLATFORM_PAIR }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
 
-  deploy:
-    needs: build-and-push
-    runs-on: ubuntu-latest
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ env.PLATFORM_PAIR }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    name: Create multi-arch image
+    needs: build
+    runs-on: ubuntu-24.04
+
+    permissions:
+      packages: write
 
     steps:
-      - name: Pull image and recreate backend on VPS
-        uses: appleboy/ssh-action@v1.2.2
+      - name: Download digests
+        uses: actions/download-artifact@v4
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          command_timeout: 10m
-          script: |
-            set -e
-            cd /opt/linler
-            docker compose -f docker-compose.prod.yml pull backend
-            docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate backend
-            docker compose -f docker-compose.prod.yml ps
-            docker logs linler-backend --tail 50
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create multi-arch manifest
+        working-directory: /tmp/digests
+        run: |
+          docker buildx imagetools create \
+            -t "${{ env.IMAGE }}:latest" \
+            -t "${{ env.IMAGE }}:${{ github.event.workflow_run.head_sha }}" \
+            $(printf '${{ env.IMAGE }}@sha256:%s ' *)
+
+  deploy:
+    name: Deploy backend to production
+    needs: merge
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    if: github.event.workflow_run.head_branch == 'main'
+
+    concurrency:
+      group: linler-backend-production
+      cancel-in-progress: false
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS access
+        run: aws sts get-caller-identity
+
+      - name: Send deployment command through SSM
+        id: deploy
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          PARAMETERS="$(cat <<'JSON'
+          {
+            "commands": [
+              "set -eu",
+              "cd /opt/linler",
+              "echo 'Pulling backend image...'",
+              "docker compose -f docker-compose.prod.yml pull backend",
+              "echo 'Recreating backend container...'",
+              "docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate backend",
+              "echo 'Checking backend API...'",
+              "for attempt in $(seq 1 30); do if curl -fsS http://127.0.0.1:3001/api >/dev/null; then echo 'Backend API check passed'; break; fi; if [ \"$attempt\" -eq 30 ]; then echo 'Backend API check failed'; docker logs --tail 100 linler-backend || true; exit 1; fi; sleep 2; done",
+              "docker compose -f docker-compose.prod.yml ps backend",
+              "docker logs --tail 50 linler-backend"
+            ]
+          }
+          JSON
+          )"
+
+          COMMAND_ID="$(aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --instance-ids "$EC2_INSTANCE_ID" \
+            --comment "Linler backend deployment ${{ github.event.workflow_run.head_sha }}" \
+            --timeout-seconds 600 \
+            --parameters "$PARAMETERS" \
+            --query "Command.CommandId" \
+            --output text)"
+
+          echo "SSM command ID: $COMMAND_ID"
+          echo "command_id=$COMMAND_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for deployment and check result
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          COMMAND_ID="${{ steps.deploy.outputs.command_id }}"
+          STATUS="Unknown"
+
+          for attempt in $(seq 1 120); do
+            STATUS="$(aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$EC2_INSTANCE_ID" \
+              --query "Status" \
+              --output text 2>/dev/null || true)"
+
+            echo "SSM status: $STATUS"
+
+            case "$STATUS" in
+              Success)
+                break
+                ;;
+              Failed|Cancelled|TimedOut|DeliveryTimedOut|ExecutionTimedOut)
+                echo "Deployment failed."
+                aws ssm get-command-invocation \
+                  --command-id "$COMMAND_ID" \
+                  --instance-id "$EC2_INSTANCE_ID" \
+                  --output json || true
+                exit 1
+                ;;
+            esac
+
+            sleep 5
+          done
+
+          if [ "$STATUS" != "Success" ]; then
+            echo "Deployment timed out. Last status: $STATUS"
+            aws ssm get-command-invocation \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$EC2_INSTANCE_ID" \
+              --output json || true
+            exit 1
+          fi
+
+          echo "=== Deployment output ==="
+
+          aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$EC2_INSTANCE_ID" \
+            --query "StandardOutputContent" \
+            --output text
+
+          echo "=== Deployment completed successfully ==="
