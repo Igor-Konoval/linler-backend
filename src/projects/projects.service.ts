@@ -10,6 +10,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { ERROR_MESSAGES } from 'src/constants/error.constants';
 import { FileService } from 'src/common/services/file.service';
+import { isSubscriptionActive } from 'src/billing/subscription.util';
 import {
   EntityChangeAction,
   ProjectMemberChangeAction,
@@ -165,6 +166,65 @@ export class ProjectsService {
     }
 
     return result;
+  }
+
+  async listProjectsForAssistant(
+    userId: string,
+    workspaceId: string,
+  ): Promise<
+    Array<{
+      id: string;
+      name: string;
+      visibility: ProjectVisibility;
+      role: ProjectRole;
+    }>
+  > {
+    const workspaceMembership = await this.getActiveWorkspaceMembership(
+      workspaceId,
+      userId,
+    );
+
+    const projects = await this.projectsRepository.find({
+      where: { workspaceId, isArchived: false },
+      order: { orderIndex: 'ASC', createdAt: 'ASC' },
+    });
+    const membershipByProjectId = await this.getProjectMembershipMap(
+      userId,
+      projects.map((project) => project.id),
+    );
+    const visible: Array<{
+      id: string;
+      name: string;
+      visibility: ProjectVisibility;
+      role: ProjectRole;
+    }> = [];
+
+    for (const project of projects) {
+      const membership = membershipByProjectId.get(project.id);
+      const isPrivate = project.visibility === ProjectVisibility.PRIVATE;
+      const isOwner = project.ownerId === userId;
+
+      if (isPrivate && !membership && !isOwner) {
+        continue;
+      }
+
+      const role =
+        membership?.role ??
+        (isOwner
+          ? ProjectRole.OWNER
+          : workspaceMembership.role === WorkspaceRole.VIEWER
+            ? ProjectRole.VIEWER
+            : ProjectRole.EDITOR);
+
+      visible.push({
+        id: project.id,
+        name: project.name,
+        visibility: project.visibility,
+        role,
+      });
+    }
+
+    return visible;
   }
 
   async getProject(
@@ -548,6 +608,9 @@ export class ProjectsService {
       avatarUrl: this.fileService.getFullAvatarUrl(
         member.user?.avatarUrl ?? null,
       ),
+      subscriptionActive: member.user
+        ? isSubscriptionActive(member.user)
+        : false,
       role: member.role,
       createdAt: member.createdAt,
     };

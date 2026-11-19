@@ -10,6 +10,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { ERROR_MESSAGES } from 'src/constants/error.constants';
 import { FileService } from 'src/common/services/file.service';
+import { isSubscriptionActive } from 'src/billing/subscription.util';
 import {
   PageChangeAction,
   RealtimeEvent,
@@ -716,6 +717,9 @@ export class PagesService {
       avatarUrl: this.fileService.getFullAvatarUrl(
         page.updatedBy?.avatarUrl ?? null,
       ),
+      subscriptionActive: page.updatedBy
+        ? isSubscriptionActive(page.updatedBy)
+        : false,
     };
   }
 
@@ -743,6 +747,7 @@ export class PagesService {
               id: actor.id,
               username: actor.username,
               avatarUrl: actor.avatarUrl,
+              subscriptionActive: actor.subscriptionActive,
             }
           : undefined,
         updatedAt: new Date().toISOString(),
@@ -759,6 +764,7 @@ export class PagesService {
       username: preview.username,
       avatarUrl: preview.avatarUrl,
       updatedAt,
+      subscriptionActive: preview.subscriptionActive,
     });
 
     await this.pagesRepository.update(
@@ -775,6 +781,7 @@ export class PagesService {
     username: string;
     avatarUrl: string | null;
     updatedAt: string;
+    subscriptionActive?: boolean;
   }> {
     if (page.recentEditors && page.recentEditors.length > 0) {
       return page.recentEditors;
@@ -792,6 +799,7 @@ export class PagesService {
         username: author.username,
         avatarUrl: author.avatarUrl,
         updatedAt: (page.updatedAt ?? new Date()).toISOString(),
+        subscriptionActive: author.subscriptionActive,
       },
     ];
   }
@@ -802,18 +810,21 @@ export class PagesService {
       username: string;
       avatarUrl: string | null;
       updatedAt: string;
+      subscriptionActive?: boolean;
     }>,
     next: {
       id: string;
       username: string;
       avatarUrl: string | null;
       updatedAt: string;
+      subscriptionActive?: boolean;
     },
   ): Array<{
     id: string;
     username: string;
     avatarUrl: string | null;
     updatedAt: string;
+    subscriptionActive?: boolean;
   }> {
     return [next, ...editors.filter((editor) => editor.id !== next.id)].slice(
       0,

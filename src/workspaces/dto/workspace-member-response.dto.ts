@@ -17,6 +17,9 @@ export class WorkspaceMemberResponseDto {
   @ApiProperty({ example: 'https://example.com/avatar.png', nullable: true })
   avatarUrl!: string | null;
 
+  @ApiProperty({ example: false })
+  subscriptionActive!: boolean;
+
   @ApiProperty({ enum: WorkspaceRole, example: WorkspaceRole.MEMBER })
   role!: WorkspaceRole;
 

@@ -19,6 +19,7 @@ import { NotificationListResponseDto } from './dto/notification-list-response.dt
 import { NotificationResponseDto } from './dto/notification-response.dto';
 import { UnreadCountResponseDto } from 'src/workspaces/dto/unread-count-response.dto';
 import type { NotificationPayload } from './notification.types';
+import { isSubscriptionActive } from 'src/billing/subscription.util';
 
 @Injectable()
 export class NotificationsService {
@@ -55,10 +56,25 @@ export class NotificationsService {
       this.countUnread(userId),
     ]);
 
+    const actors = await this.findUserMap(
+      notifications.map((notification) => notification.payload.actorUserId),
+    );
+
     return {
-      notifications: notifications.map((notification) =>
-        this.toResponse(notification),
-      ),
+      notifications: notifications.map((notification) => {
+        const response = this.toResponse(notification);
+        const actor = actors.get(notification.payload.actorUserId);
+
+        return {
+          ...response,
+          payload: {
+            ...response.payload,
+            actorSubscriptionActive: actor
+              ? isSubscriptionActive(actor)
+              : Boolean(response.payload.actorSubscriptionActive),
+          },
+        };
+      }),
       unreadCount,
       meta: buildPageMeta(totalItems, page, limit),
     };
@@ -112,6 +128,7 @@ export class NotificationsService {
         actorUserId: actor.id,
         actorUsername: actor.username,
         actorAvatarUrl: this.fileService.getFullAvatarUrl(actor.avatarUrl),
+        actorSubscriptionActive: isSubscriptionActive(actor),
         workspaceId: params.workspaceId,
         workspaceName,
         targetUserId: actor.id,
@@ -153,6 +170,7 @@ export class NotificationsService {
       actorUserId: actorUser.id,
       actorUsername: actorUser.username,
       actorAvatarUrl: this.fileService.getFullAvatarUrl(actorUser.avatarUrl),
+      actorSubscriptionActive: isSubscriptionActive(actorUser),
       workspaceId: params.workspaceId,
       workspaceName,
       projectId: params.projectId,

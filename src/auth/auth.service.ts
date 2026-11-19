@@ -20,6 +20,8 @@ import type {
 import * as bcrypt from 'bcrypt';
 import { hashToken } from 'src/modules/auth/utils/token-hash.utils';
 import type { AuthUser } from 'src/types/user.type';
+import { UserEntity } from 'src/users/entities/user.entity';
+import { toSubscriptionState } from 'src/billing/subscription.util';
 import { ERROR_MESSAGES } from 'src/constants/error.constants';
 import { ENV_VARIABLES } from 'src/constants/env.constants';
 import { ConfigService } from '@nestjs/config';
@@ -40,12 +42,17 @@ export class AuthService {
     private readonly sessionsRepository: Repository<UserSessionEntity>,
   ) {}
 
-  private toAuthUser(user: AuthUser): AuthUser {
+  private toAuthUser(user: UserEntity): AuthUser {
+    const subscription = toSubscriptionState(user);
+
     return {
       id: user.id,
       email: user.email,
       username: user.username,
       avatarUrl: this.fileService.getFullAvatarUrl(user.avatarUrl),
+      subscriptionActive: subscription.subscriptionActive,
+      subscriptionCancelAtPeriodEnd: subscription.subscriptionCancelAtPeriodEnd,
+      subscriptionCurrentPeriodEnd: subscription.subscriptionCurrentPeriodEnd,
     };
   }
 
@@ -199,7 +206,7 @@ export class AuthService {
   }
 
   private async createAuthSession(
-    user: AuthUser,
+    user: UserEntity,
     meta: RequestMeta,
   ): Promise<AuthResult> {
     const refreshExpiresAt = new Date(Date.now() + this.refreshTtlMs);

@@ -1,0 +1,16 @@
+---
+description: Linler backend stack and where new code goes
+alwaysApply: true
+---
+
+# Stack
+
+NestJS 11, TypeORM, Postgres, Zod is not used here. Validation uses class-validator. Package manager is pnpm. Node `24.x` when the frontend repo is the reference runtime.
+
+- A feature module lives under `src/<feature>` with `module`, `controller`, `service`, and `dto`.
+- User billing state is stored on `UserEntity`. Stripe calls stay in `BillingService`.
+- Webhooks read the raw body. Do not parse the Stripe signature from a re-serialized JSON body.
+- Reuse `ERROR_MESSAGES` for client-facing errors. Write those messages in English.
+- Do not leave protocol or domain string literals inline in a service. Put them in `src/constants`, for example `STRIPE_VALUES.SUBSCRIPTION` and `OPEN_SUBSCRIPTION_STATUSES` in `src/constants/stripe.constants.ts`.
+- A patch or payload passed into a service method is a named interface in `src/types`, not an inline object type on the method.
+- `synchronize` is enabled locally, so a new column on an entity is applied when the API starts. Do not add a second migration tool for this change.

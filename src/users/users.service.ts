@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { UserEntity } from './entities/user.entity';
 import { Repository } from 'typeorm';
+import { UpdateUserBilling } from 'src/types/billing.type';
 import { CreateUserParams } from 'src/types/user.type';
 import { ERROR_MESSAGES } from 'src/constants/error.constants';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -108,5 +109,28 @@ export class UsersService {
     user.avatarUrl = null;
 
     return this.usersRepository.save(user);
+  }
+
+  async updateBilling(
+    userId: string,
+    patch: UpdateUserBilling,
+  ): Promise<UserEntity> {
+    const user = await this.findById(userId);
+
+    if (!user) {
+      throw new NotFoundException(ERROR_MESSAGES.USER_NOT_FOUND);
+    }
+
+    Object.assign(user, patch);
+
+    return this.usersRepository.save(user);
+  }
+
+  async findByStripeSubscriptionId(
+    stripeSubscriptionId: string,
+  ): Promise<UserEntity | null> {
+    return this.usersRepository.findOne({
+      where: { stripeSubscriptionId },
+    });
   }
 }

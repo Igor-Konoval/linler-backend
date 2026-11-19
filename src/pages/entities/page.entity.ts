@@ -104,6 +104,7 @@ export class PageEntity {
     username: string;
     avatarUrl: string | null;
     updatedAt: string;
+    subscriptionActive?: boolean;
   }> | null;
 
   @Column({ name: 'order_index', type: 'int', default: 0 })
