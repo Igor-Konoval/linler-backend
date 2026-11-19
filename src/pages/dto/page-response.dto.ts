@@ -92,6 +92,7 @@ export class PageResponseDto {
     id: string;
     username: string;
     avatarUrl: string | null;
+    subscriptionActive: boolean;
   };
 
   @ApiProperty({
@@ -105,6 +106,7 @@ export class PageResponseDto {
     username: string;
     avatarUrl: string | null;
     updatedAt: string;
+    subscriptionActive?: boolean;
   }>;
 
   @ApiProperty({ enum: ProjectRole, example: ProjectRole.EDITOR })

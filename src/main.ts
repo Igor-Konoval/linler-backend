@@ -19,7 +19,9 @@ import {
 } from './common/utils/upload-path.util';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    rawBody: true,
+  });
 
   app.useWebSocketAdapter(new RealtimeIoAdapter(app));
   app.set('trust proxy', 1);

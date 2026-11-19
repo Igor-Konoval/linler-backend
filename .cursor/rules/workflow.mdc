@@ -1,0 +1,18 @@
+---
+description: Branch, production, and verification rules for Linler backend
+alwaysApply: true
+---
+
+# Workflow
+
+- Stay on `igor/feat/<name>`, `igor/fix/<name>`, or `igor/bug/<name>`. Create that branch before the first code edit of a task.
+- Do not commit, push, or merge into `main` or `dev` unless the user names that branch in the chat.
+- Code changes: the same agent runs `pnpm lint:check` before handing the work back. Do not delegate that command to a subagent. If it fails, fix the errors in this session.
+- Billing changes also need `pnpm test` when a spec covers the changed service.
+- Secrets stay out of git. Stripe keys belong in `.env`. Reject any key that does not start with `sk_test_`.
+
+```text
+igor/feat/stripe-billing    feature
+igor/fix/page-save          correction
+igor/bug/invite-toast       defect
+```

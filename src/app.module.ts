@@ -3,7 +3,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AssistantModule } from './assistant/assistant.module';
 import { AuthModule } from './auth/auth.module';
+import { BillingModule } from './billing/billing.module';
 import { getTypeOrmConfig } from './config/typeorm.config';
 import { PagesModule } from './pages/pages.module';
 import { ProjectsModule } from './projects/projects.module';
@@ -23,6 +25,8 @@ import { WorkspacesModule } from './workspaces/workspaces.module';
       inject: [ConfigService],
     }),
     AuthModule,
+    BillingModule,
+    AssistantModule,
     UsersModule,
     WorkspacesModule,
     NotificationsModule,

@@ -20,6 +20,9 @@ export const ERROR_MESSAGES = {
   // User
   USER_NOT_FOUND: 'User not found',
   USER_ALREADY_EXISTS: 'User with this email already exists',
+  BILLING_NOT_CONFIGURED:
+    'Stripe test billing is not configured. Add a test secret key and price id.',
+  BILLING_TEST_MODE_ONLY: 'Only Stripe test keys are allowed.',
 
   // Workspace
   WORKSPACE_NOT_FOUND: 'Workspace not found',
@@ -72,6 +75,21 @@ export const ERROR_MESSAGES = {
   // Attachments
   ATTACHMENT_NOT_FOUND: 'Attachment not found',
   FAILED_TO_UPLOAD_ATTACHMENT: 'Failed to upload attachment',
+
+  // Assistant
+  ASSISTANT_SUBSCRIPTION_REQUIRED:
+    'The assistant is available while the subscription is active.',
+  ASSISTANT_NOT_CONFIGURED: 'The assistant is not configured.',
+  ASSISTANT_UNAVAILABLE:
+    'The assistant could not complete the request. Try again.',
+  ASSISTANT_ACTION_TARGET_NOT_FOUND:
+    'The requested item was not found or is no longer available.',
+  ASSISTANT_ACTION_TARGET_AMBIGUOUS:
+    'The requested text matches more than one place. Please specify a unique phrase.',
+  ASSISTANT_TABLE_SHAPE_MISMATCH:
+    'The table structure does not match the requested update. Please try again with the current table.',
+  ASSISTANT_WORKSPACE_SELECTION_REQUIRED:
+    'Please specify which workspace to use for this project.',
 
   // Generic
   INTERNAL_SERVER_ERROR: 'Internal server error',
